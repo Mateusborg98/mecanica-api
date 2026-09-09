@@ -6,67 +6,105 @@ import java.util.Objects;
 
 public class CpfCnpj {
 
+    private static final int CPF_LENGTH = 11;
+    private static final int CNPJ_LENGTH = 14;
+
+    private static final int[] CNPJ_FIRST_WEIGHTS = {
+            5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2
+    };
+
+    private static final int[] CNPJ_SECOND_WEIGHTS = {
+            6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2
+    };
+
     private final String valor;
 
     public CpfCnpj(String valor) throws CpfInvalidoException {
-        String cpfNormalizado = normalizar(valor);
+        String documentoNormalizado = normalizar(valor);
 
-        validar(cpfNormalizado);
+        validar(documentoNormalizado);
 
-        this.valor = valor;
+        this.valor = documentoNormalizado;
     }
 
     private String normalizar(String cpfCnpj) throws CpfInvalidoException {
 
         if (cpfCnpj == null) {
-            throw new CpfInvalidoException("CPF não pode ser nulo");
+            throw new CpfInvalidoException("CPF/CNPJ não pode ser nulo");
         }
 
         return cpfCnpj.replaceAll("\\D", "");
     }
 
-    private void validar(String cpfCnpj) throws CpfInvalidoException {
+    private void validar(String documento) throws CpfInvalidoException {
 
-        if (cpfCnpj.length() != 11) {
-            throw new CpfInvalidoException("CPF inválido");
+        if (documento.length() != CPF_LENGTH
+                && documento.length() != CNPJ_LENGTH) {
+            throw new CpfInvalidoException("CPF/CNPJ inválido");
         }
 
-        if (cpfCnpj.matches("(\\d)\\1{10}")) {
-            throw new CpfInvalidoException("CPF inválido");
+        if (documento.matches("(\\d)\\1+")) {
+            throw new CpfInvalidoException("CPF/CNPJ inválido");
         }
 
-        if (!validarDigitos(cpfCnpj)) {
-            throw new CpfInvalidoException("CPF inválido");
+        boolean valido = documento.length() == CPF_LENGTH
+                ? validarCpf(documento)
+                : validarCnpj(documento);
+
+        if (!valido) {
+            throw new CpfInvalidoException("CPF/CNPJ inválido");
         }
     }
 
-    private boolean validarDigitos(String cpfCnpj) {
+    private boolean validarCpf(String cpf) {
 
         int soma = 0;
 
         for (int i = 0; i < 9; i++) {
-            soma += (cpfCnpj.charAt(i) - '0') * (10 - i);
+            soma += valorNumerico(cpf, i) * (10 - i);
         }
 
         int digito1 = 11 - (soma % 11);
 
         if (digito1 >= 10) digito1 = 0;
 
-        if (digito1 != (cpfCnpj.charAt(9) - '0')) {
+        if (digito1 != valorNumerico(cpf, 9)) {
             return false;
         }
 
         soma = 0;
 
         for (int i = 0; i < 10; i++) {
-            soma += (cpfCnpj.charAt(i) - '0') * (11 - i);
+            soma += valorNumerico(cpf, i) * (11 - i);
         }
 
         int digito2 = 11 - (soma % 11);
 
         if (digito2 >= 10) digito2 = 0;
 
-        return digito2 == (cpfCnpj.charAt(10) - '0');
+        return digito2 == valorNumerico(cpf, 10);
+    }
+
+    private boolean validarCnpj(String cnpj) {
+        return calcularDigitoCnpj(cnpj, CNPJ_FIRST_WEIGHTS)
+                == valorNumerico(cnpj, 12)
+                && calcularDigitoCnpj(cnpj, CNPJ_SECOND_WEIGHTS)
+                == valorNumerico(cnpj, 13);
+    }
+
+    private int calcularDigitoCnpj(String cnpj, int[] pesos) {
+        int soma = 0;
+
+        for (int i = 0; i < pesos.length; i++) {
+            soma += valorNumerico(cnpj, i) * pesos[i];
+        }
+
+        int resto = soma % 11;
+        return resto < 2 ? 0 : 11 - resto;
+    }
+
+    private int valorNumerico(String documento, int indice) {
+        return documento.charAt(indice) - '0';
     }
 
     public String getValor() {

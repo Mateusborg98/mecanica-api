@@ -219,14 +219,16 @@ class DomainCoverageTest {
     @Test
     void cpfCnpjDeveNormalizarValidarEImplementarContratoDeValor() {
         var formatado = new CpfCnpj("529.982.247-25");
-        var igual = new CpfCnpj("529.982.247-25");
+        var igual = new CpfCnpj(CPF);
+        var cnpj = new CpfCnpj("11.222.333/0001-81");
 
-        assertEquals("529.982.247-25", formatado.getValor());
-        assertEquals("529.982.247-25", formatado.toString());
+        assertEquals(CPF, formatado.getValor());
+        assertEquals(CPF, formatado.toString());
         assertEquals(formatado, formatado);
         assertEquals(formatado, igual);
         assertEquals(formatado.hashCode(), igual.hashCode());
-        assertNotEquals(formatado, new CpfCnpj(CPF));
+        assertEquals("11222333000181", cnpj.getValor());
+        assertNotEquals(formatado, cnpj);
         assertNotEquals(formatado, "cpf");
 
         assertThrows(CpfInvalidoException.class, () -> new CpfCnpj(null));
@@ -234,6 +236,8 @@ class DomainCoverageTest {
         assertThrows(CpfInvalidoException.class, () -> new CpfCnpj("11111111111"));
         assertThrows(CpfInvalidoException.class, () -> new CpfCnpj("52998224724"));
         assertThrows(CpfInvalidoException.class, () -> new CpfCnpj("52998224715"));
+        assertThrows(CpfInvalidoException.class, () -> new CpfCnpj("11111111111111"));
+        assertThrows(CpfInvalidoException.class, () -> new CpfCnpj("11222333000180"));
     }
 
     @Test
