@@ -135,6 +135,25 @@ A aplicação fornece:
 
 O agente, dashboards e alertas Datadog pertencem ao repositório de infraestrutura Kubernetes.
 
+### Traces e correlação com logs
+
+No EKS, o Datadog Admission Controller injeta automaticamente o tracer Java
+no pod `mecanica-api`. O manifesto define `DD_SERVICE=mecanica-api`, utiliza o
+ambiente da implantação em `DD_ENV` e habilita `DD_LOGS_INJECTION`, permitindo
+abrir os logs relacionados a partir de um trace.
+
+Depois do deploy, gere chamadas autenticadas e valide:
+
+```bash
+kubectl get pod -n mecanica -l app=mecanica-api \
+  -o jsonpath='{.items[0].spec.initContainers[*].name}'
+kubectl exec -n mecanica deployment/mecanica-api -- printenv DD_TRACE_AGENT_URL
+```
+
+No Datadog, use `APM > Traces` com `service:mecanica-api env:prod` e
+`Logs > Explorer` com o mesmo filtro. A amostragem está em 100% apenas para a
+demonstração acadêmica de baixo volume.
+
 O roteiro completo de conferência e das evidências necessárias para a entrega
 está em [docs/delivery-checklist.md](docs/delivery-checklist.md).
 
