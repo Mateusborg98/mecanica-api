@@ -22,6 +22,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: mecanica-api
   K8S_NAMESPACE: mecanica
+  DEPLOYMENT_ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
 
 jobs:
   deploy:
@@ -124,6 +125,9 @@ jobs:
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/app-configmap.yaml
+          kubectl -n "$K8S_NAMESPACE" patch configmap mecanica-api-config \
+            --type merge \
+            -p "{\"data\":{\"APP_ENVIRONMENT\":\"$DEPLOYMENT_ENVIRONMENT\"}}"
           kubectl apply -f k8s/app-service.yaml
           kubectl set image -f k8s/app-deployment.yaml \
             mecanica-api="$IMAGE_URI" \

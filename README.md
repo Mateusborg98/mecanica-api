@@ -31,7 +31,10 @@ flowchart LR
     API --> Obs[Datadog]
 ```
 
-Diagramas de componentes, sequências e modelo ER: [docs/architecture.md](docs/architecture.md). Decisões: [docs/adr](docs/adr) e [docs/rfc](docs/rfc).
+Diagramas de componentes e sequências: [docs/architecture.md](docs/architecture.md).
+Modelo ER e justificativa do PostgreSQL: [docs/relational-model.md](docs/relational-model.md).
+Descoberta do domínio: [docs/domain](docs/domain/README.md). Decisões:
+[docs/adr](docs/adr) e [docs/rfc](docs/rfc).
 
 ## Autenticação
 
@@ -47,8 +50,13 @@ GET /ordens-servico
 Authorization: Bearer <accessToken>
 ```
 
-- Swagger: `/swagger-ui/index.html`
-- OpenAPI: `/v3/api-docs`
+- [Swagger pelo API Gateway](https://3o3iqeu0b9.execute-api.us-east-1.amazonaws.com/swagger-ui/index.html)
+- [OpenAPI JSON](https://3o3iqeu0b9.execute-api.us-east-1.amazonaws.com/v3/api-docs)
+- [Coleção Postman incluindo `POST /auth`](docs/postman/mecanica-fase3.postman_collection.json)
+
+O Swagger é gerado pela aplicação Spring e, por isso, não contém a rota
+serverless `POST /auth`. A coleção Postman documenta e automatiza esse fluxo,
+armazenando o token retornado apenas em uma variável local da coleção.
 
 ## Testes
 
@@ -56,7 +64,7 @@ Authorization: Bearer <accessToken>
 .\mvnw.cmd clean verify
 ```
 
-Os testes usam H2 em memória. O comando também gera `target/site/jacoco/index.html` e exige ao menos 80% de cobertura. A última validação local executou 100 testes com sucesso.
+Os testes usam H2 em memória. O comando também gera `target/site/jacoco/index.html` e exige ao menos 80% de cobertura. A última validação local executou 101 testes com sucesso.
 
 ## Execução local com Docker
 
@@ -134,6 +142,25 @@ A aplicação fornece:
 - healthchecks `/actuator/health/liveness` e `/actuator/health/readiness`.
 
 O agente, dashboards e alertas Datadog pertencem ao repositório de infraestrutura Kubernetes.
+
+### Traces e correlação com logs
+
+No EKS, o Datadog Admission Controller injeta automaticamente o tracer Java
+no pod `mecanica-api`. O manifesto define `DD_SERVICE=mecanica-api`, utiliza o
+ambiente da implantação em `DD_ENV` e habilita `DD_LOGS_INJECTION`, permitindo
+abrir os logs relacionados a partir de um trace.
+
+Depois do deploy, gere chamadas autenticadas e valide:
+
+```bash
+kubectl get pod -n mecanica -l app=mecanica-api \
+  -o jsonpath='{.items[0].spec.initContainers[*].name}'
+kubectl exec -n mecanica deployment/mecanica-api -- printenv DD_TRACE_AGENT_URL
+```
+
+No Datadog, use `APM > Traces` com `service:mecanica-api env:prod` e
+`Logs > Explorer` com o mesmo filtro. A amostragem está em 100% apenas para a
+demonstração acadêmica de baixo volume.
 
 O roteiro completo de conferência e das evidências necessárias para a entrega
 está em [docs/delivery-checklist.md](docs/delivery-checklist.md).
