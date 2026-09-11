@@ -4,19 +4,37 @@
 
 ```mermaid
 flowchart LR
-    Client[Cliente] --> Gateway[AWS API Gateway]
-    Gateway -->|POST /auth| Lambda[Lambda de autenticação]
-    Gateway -->|Rotas da oficina| LB[Load Balancer]
-    Lambda --> RDS[(Amazon RDS PostgreSQL)]
-    Lambda -->|JWT RS256| Client
-    Client -->|Bearer JWT| Gateway
-    LB --> API[Spring Boot no Amazon EKS]
+    Client[Cliente / Swagger / Postman]
+
+    subgraph AWS[Amazon Web Services - us-east-1]
+        Gateway[AWS API Gateway HTTP API]
+        Lambda[Lambda Auth - Java 21]
+        ECR[Amazon ECR]
+        LB[Elastic Load Balancer]
+        subgraph EKS[Amazon EKS]
+            API[Spring Boot API]
+            HPA[HPA]
+            MetricsServer[Metrics Server]
+            Agent[Datadog Agent]
+        end
+        RDS[(Amazon RDS PostgreSQL)]
+        S3[(S3 - Terraform states)]
+    end
+
+    GitHub[GitHub Actions] -->|Terraform| S3
+    GitHub -->|imagem| ECR
+    GitHub -->|deploy| EKS
+    Client --> Gateway
+    Gateway -->|POST /auth| Lambda
+    Gateway -->|demais rotas| LB
+    LB --> API
+    Lambda --> RDS
     API --> RDS
-    API --> Metrics[Actuator e Prometheus]
-    API --> Logs[Logs JSON]
-    Metrics --> Datadog[Datadog]
-    Logs --> Datadog
-    EKS[HPA e Metrics Server] --> API
+    ECR --> API
+    MetricsServer --> HPA
+    HPA --> API
+    API -->|métricas, logs e traces| Agent
+    Agent --> Datadog[Datadog SaaS]
 ```
 
 O API Gateway é o ponto de entrada. A Lambda valida CPF/CNPJ, consulta o cliente no RDS e assina um JWT com a chave privada RSA. A aplicação conhece somente a chave pública e valida assinatura, emissor e expiração. O banco é externo ao EKS e suas migrations são executadas pelo Flyway.
@@ -71,12 +89,16 @@ erDiagram
     PECA ||--|| ESTOQUE : possui
 ```
 
-O PostgreSQL foi escolhido por oferecer transações ACID, integridade referencial, índices e bom suporte no RDS. As tabelas associativas preservam quantidade, preço cobrado e datas da execução, evitando que alterações futuras no catálogo modifiquem o histórico da ordem.
+O PostgreSQL foi escolhido por oferecer transações ACID, integridade referencial, índices e bom suporte no RDS. As tabelas associativas preservam quantidade, preço cobrado e datas da execução, evitando que alterações futuras no catálogo modifiquem o histórico da ordem. A justificativa formal, as cardinalidades e os ajustes realizados estão em [relational-model.md](relational-model.md).
+
+Os artefatos editáveis de descoberta que originaram esses fluxos estão em [domain/](domain/README.md).
 
 ## Observabilidade
 
 - Spring Boot Actuator fornece healthchecks e métricas HTTP/JVM.
 - `/actuator/prometheus` expõe métricas para coleta pelo Datadog OpenMetrics.
 - Logs são emitidos em JSON e possuem `correlationId` recebido ou gerado por requisição.
+- O tracer Java é injetado pelo Datadog Admission Controller e correlaciona
+  spans HTTP/JDBC com os logs.
 - O HPA utiliza CPU e memória para escalar os pods.
 - Dashboards e alertas do Datadog devem cobrir latência, uptime, recursos do Kubernetes, erros de integração, volume de ordens e duração dos status.
